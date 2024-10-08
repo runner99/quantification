@@ -83,6 +83,10 @@ xtdata是xtquant库中提供行情相关数据的模块，本模块旨在提供�
   - `get_trading_time`更新实现逻辑
 - 2024-01-26
   - 获取合约基础信息 `get_instrument_detail` 支持获取全部合约信息字段
+- 2024-05-15
+  - 获取最新交易日k线数据`get_full_kline`
+- 2024-05-27
+  - `get_stock_list_in_sector` 增加`real_timetag`参数
 
 ## 接口概述
 
@@ -152,6 +156,14 @@ xtdata提供和MiniQmt的交互接口，本质是和MiniQmt建立连接，由Min
     - `historymaincontract` - 历史主力合约
     - `stoppricedata` - 涨跌停数据
     - `snapshotindex` - 快照指标数据
+    - `stocklistchange` - 板块成分股变动历史
+    - `limitupperformance` - 涨跌表现
+    - `announcement` - 新闻公告
+    - `hktstatistics` - 港股持仓统计
+    - `hktdetails` - 港股持仓明细
+    - `riskfreerate` - 无风险利率
+    - `etfstatistics` - etf实时申赎数据level1
+    - `etfstatisticsl2` - etf实时申赎数据level2
 - 时间范围，用于指定数据请求范围，表示的范围是`[start_time, end_time]`区间（包含前后边界）中最后不多于`count`个数据
   - start_time - 起始时间，为空则认为是最早的起始时间
   - end_time - 结束时间，为空则认为是最新的结束时间
@@ -684,6 +696,22 @@ download_holiday_data()
 - 返回
   - 无
 
+#### 获取最新交易日k线数据
+
+```python
+get_full_kline(field_list = [], stock_list = [], period = '1m'
+    , start_time = '', end_time = '', count = 1
+    , dividend_type = 'none', fill_data = True)
+```
+
+- 释义
+  - 获取最新交易日k线全推数据
+
+- 参数
+  - 参考`get_market_data`函数
+- 返回
+  - dict - {field: DataFrame}
+
 ### 财务数据接口
 
 #### 获取财务数据
@@ -820,6 +848,25 @@ get_instrument_detail(stock_code, iscomplete)
     InstrumentName - string 合约名称
     ProductID - string 合约的品种ID(期货)
     ProductName - string 合约的品种名称(期货)
+    ProductType - int 合约的类型, 默认-1
+    国内期货市场：1-期货 2-期权(DF SF ZF INE GF) 3-组合套利 4-即期 5-期转现 6-期权(IF) 7-结算价交易(tas)
+    沪深股票期权市场：0-认购 1-认沽
+    外盘：
+        1-100：期货， 101-200：现货, 201-300:股票相关
+        1：股指期货
+        2：能源期货
+        3：农业期货
+        4：金属期货
+        5：利率期货
+        6：汇率期货
+        7：数字货币期货
+        99：自定义合约期货
+        107：数字货币现货
+        201：股票
+        202：GDR
+        203：ETF
+        204：ETN
+        300：其他
     ExchangeCode - string 交易所代码
     UniCode - string 统一规则代码
     CreateDate - str 上市日期(期货)
@@ -914,13 +961,14 @@ get_sector_list()
 #### 获取板块成分股列表
 
 ```python
-get_stock_list_in_sector(sector_name)
+get_stock_list_in_sector(sector_name, real_timetag)
 ```
 
 - 释义
   - 获取板块成分股列表
 - 参数
   - sector_name - string 版块名称
+  - real_timetag 时间：1512748800000或'20171209'，可缺省，缺省时获取最新的成分，不缺省时获取对应时间的历史成分
 - 返回
   - list 成分股列表，[ stock1, stock2, ... ]
 - 备注
@@ -1199,6 +1247,58 @@ download_index_weight()
 'offerLevelVolume'      #委卖量
 'bidLevelNumber'        #委买数量
 'offLevelNumber'        #委卖数量
+```
+
+#### limitupperformance - 涨停连板数据
+
+```python
+'time'           #时间戳
+'openVol'        #开盘集合竞价的成交量
+'closeVol'       #收盘集合竞价的成交量
+'finalVol'       #盘后定价的成交量
+'startUp'        #涨停开始时间
+'endUp'          #涨停结束时间
+'breakUp'        #炸板次数
+'upAmount'       #涨停金额
+'startDn'        #跌停开始时间
+'endDn'          #跌停结束时间
+'breakDn'        #开板次数
+'dnAmount'       #跌停金额
+'direct'         #涨跌方向 0-无 1-涨停 2-跌停
+'sealVolRatio'   #封成比
+'sealFreeRatio'  #封流比
+'bidPreRatio'    #竞昨比
+'sealCount'      #几板
+'sealDays'       #几天
+'sealBreak'      #封板中断天数
+```
+
+#### announcement - 公告新闻
+
+```python
+'time'            #时间戳
+'level'           #级别
+'security'        #证券
+'headline'        #标题
+'summary'         #摘要
+'format'          #格式 txt pdf doc
+'content'         #内容
+'type'            #类型 0-其他 1-财报类
+```
+
+#### snapshotindex - 快照指标
+
+```python
+'time'              #时间戳
+'volRatio'          #量比
+'speed1'            #涨速1分钟
+'speed5'            #涨速5分钟
+'gainRate3'         #3日涨跌
+'gainRate5'         #5日涨跌
+'gainRate10'        #10日涨跌
+'turnoverRate3'     #3日换手
+'turnoverRate5'     #5日换手
+'turnoverRate10'    #10日换手
 ```
 
 ### 数据字典

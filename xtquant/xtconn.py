@@ -1,15 +1,12 @@
 ﻿#coding:utf-8
 
-import os
-import json
 from .xtdatacenter import try_create_client
-from . import xtbson as bson
 
 ### config
 localhost = '127.0.0.1'
 
 ### function
-
+status_callback = None
 
 def try_create_connection(addr):
     '''
@@ -24,8 +21,9 @@ def try_create_connection(addr):
     cl = try_create_client()
     cl.set_config_addr(addr)
 
-    from .xtdata import status_callback
-    cl.subscribeCommonControl("watchxtquantstatus", bson.BSON.encode({}), status_callback)
+    global status_callback
+    if status_callback:
+        cl.registerCommonControlCallback("watchxtquantstatus", status_callback)
 
     ec, msg = cl.connect()
     if ec < 0:
@@ -41,6 +39,10 @@ def create_connection(addr):
 
 
 def scan_available_server():
+    import os
+    import json
+    import sys
+
     result = []
 
     try:
@@ -48,6 +50,7 @@ def scan_available_server():
         local_server_port = get_local_server_port()
         if local_server_port:
             result.append(f'127.0.0.1:{local_server_port}')
+            return result
     except:
         pass
 
@@ -56,10 +59,14 @@ def scan_available_server():
 
         for f in os.scandir(config_dir):
             full_path = f.path
+            
+            f_running_status = os.path.join(full_path, 'running_status')
+            if not os.path.exists(f_running_status):
+                continue
 
             is_running = False
             try:
-                os.remove(os.path.join(full_path, 'running_status'))
+                os.remove(f_running_status)
             except PermissionError:
                 is_running = True
             except Exception as e:
@@ -68,8 +75,12 @@ def scan_available_server():
             if not is_running:
                 continue
 
+            f_xtdata_cfg = os.path.join(full_path, 'xtdata.cfg')
+            if not os.path.exists(f_xtdata_cfg):
+                continue
+
             try:
-                config = json.load(open(os.path.join(full_path, 'xtdata.cfg'), 'r', encoding = 'utf-8'))
+                config = json.load(open(f_xtdata_cfg, 'r', encoding = 'utf-8'))
 
                 ip = config.get('ip', localhost)
                 port = config.get('port', None)
@@ -77,24 +88,32 @@ def scan_available_server():
                     raise Exception(f'invalid port: {port}')
 
                 addr = f'{ip}:{port}'
-                result.append(addr)
+                
+                root_dir = os.path.normpath(config.get('root_dir', ''))
+                if root_dir and os.path.normpath(sys.executable).find(root_dir) == 0:
+                    result.insert(0, addr)
+                else:
+                    result.append(addr)
             except Exception as e:
                 continue
 
     except Exception as e:
         pass
 
-    result.sort()
     return result
 
 
-def connect_any(addr_list):
+def connect_any(addr_list, start_port, end_port):
     '''
     addr_list: [ addr, ... ]
         addr: 'localhost:58610'
     '''
     for addr in addr_list:
         try:
+            port = int(addr.split(':')[1])
+            if start_port > port or port > end_port:
+                continue
+
             cl = create_connection(addr)
             if cl:
                 return cl

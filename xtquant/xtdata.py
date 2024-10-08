@@ -1,13 +1,11 @@
 #coding:utf-8
 
-import os, sys
-import time
-import traceback
-import json
-import datetime as dt
+import os as _OS_
+import time as _TIME_
+import traceback as _TRACEBACK_
 
-from . import xtbson as bson
-from . import xtutil
+from . import xtbson as _BSON_
+
 
 
 __all__ = [
@@ -53,12 +51,13 @@ __all__ = [
 ]
 
 def try_except(func):
+    import sys
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except Exception:
             exc_type, exc_instance, exc_traceback = sys.exc_info()
-            formatted_traceback = ''.join(traceback.format_tb(exc_traceback))
+            formatted_traceback = ''.join(_TRACEBACK_.format_tb(exc_traceback))
             message = '\n{0} raise {1}:{2}'.format(
                 formatted_traceback,
                 exc_type.__name__,
@@ -105,20 +104,32 @@ def connect(ip = '', port = None, remember_if_success = True):
 
     from . import xtconn
 
-    if not ip:
-        ip = 'localhost'
+    if not port and (ip != '' and ip != '127.0.0.1' and ip != 'localhost'):
+        raise Exception("远程地址不支持仅输入IP")
 
-    if port:
-        server_list = [f'{ip}:{port}']
-        __client = xtconn.connect_any(server_list)
+    if isinstance(port, int):
+        if ip:
+            server_list = [f'{ip}:{port}']
+        else:
+            server_list = [f'127.0.0.1:{port}', f'localhost:{port}']
     else:
         server_list = xtconn.scan_available_server()
 
-        default_addr = 'localhost:58610'
+        default_addr = '127.0.0.1:58610'
         if not default_addr in server_list:
             server_list.append(default_addr)
 
-        __client = xtconn.connect_any(server_list)
+    start_port = 0
+    end_port = 65535
+
+    if isinstance(port, tuple):
+        start_port = port[0]
+        end_port = port[1]
+
+    if start_port > end_port:
+        start_port, end_port = end_port, start_port
+
+    __client = xtconn.connect_any(server_list, start_port, end_port)
 
     if not __client or not __client.is_connected():
         raise Exception("无法连接xtquant服务，请检查QMT-投研版或QMT-极简版是否开启")
@@ -129,12 +140,12 @@ def connect(ip = '', port = None, remember_if_success = True):
 
     data_dir = __client.get_data_dir()
     if data_dir == "":
-        data_dir = os.path.join(__client.get_app_dir(), default_data_dir)
+        data_dir = _OS_.path.join(__client.get_app_dir(), default_data_dir)
 
-    data_dir = os.path.abspath(data_dir)
+    data_dir = _OS_.path.abspath(data_dir)
 
     try:
-        __download_version = __bsoncall_common(
+        __download_version = _BSON_call_common(
             __client.commonControl, 'getapiversion', {}
         ).get('downloadversion', None)
     except:
@@ -154,6 +165,17 @@ def reconnect(ip = '', port = None, remember_if_success = True):
         data_dir = default_data_dir
 
     return connect(ip, port, remember_if_success)
+
+
+def disconnect():
+    global __client
+    global data_dir
+
+    if __client:
+        __client.shutdown()
+        __client = None
+        data_dir = default_data_dir
+    return
 
 
 def get_client():
@@ -180,7 +202,7 @@ def hello():
     data_dir = None
 
     try:
-        server_info = bson.BSON.decode(__client.get_server_tag())
+        server_info = _BSON_.BSON.decode(__client.get_server_tag())
         peer_addr = __client.get_peer_addr()
         data_dir = __client.get_data_dir()
     except Exception as e:
@@ -203,7 +225,7 @@ def get_field_list(metaid):
     global __meta_field_list
 
     if not __meta_field_list:
-        x = open(os.path.join(os.path.dirname(__file__), 'config', 'metaInfo.json'), 'r', encoding="utf-8").read()
+        x = open(_OS_.path.join(_OS_.path.dirname(__file__), 'config', 'metaInfo.json'), 'r', encoding="utf-8").read()
         metainfo = eval(x)
 
         for meta in metainfo:
@@ -238,27 +260,34 @@ def create_array(shape, dtype_tuple, capsule, size):
     obj._base = capsule
     return np.ndarray(shape = shape, dtype = np.dtype(dtype_tuple), buffer = obj)
 
-from .xtdatacenter import register_create_nparray
-register_create_nparray(create_array)
+from .xtdatacenter import register_create_nparray as __register_create_nparray
+__register_create_nparray(create_array)
 
 
-def __bsoncall_common(interface, func, param):
-    return bson.BSON.decode(interface(func, bson.BSON.encode(param)))
+def _BSON_call_common(interface, func, param):
+    return _BSON_.BSON.decode(interface(func, _BSON_.BSON.encode(param)))
 
 
 ### function
 
-def get_stock_list_in_sector(sector_name):
+def get_stock_list_in_sector(sector_name, real_timetag = -1):
     '''
     获取板块成份股，支持客户端左侧板块列表中任意的板块，包括自定义板块
     :param sector_name: (str)板块名称
+    :real_timetag: 时间：1512748800000 或 ‘20171209’，可缺省，缺省为获取最新成份，不缺省时获取对应时间的历史成份
     :return: list
     '''
     client = get_client()
     for illegalstr in ['\\', '/', ':', '*', '?', '"', '<', '>', '|']:
         sector_name = sector_name.replace(illegalstr, '')
 
-    return client.get_stock_list_in_sector(sector_name, 0)
+    if isinstance(real_timetag, str):
+        if real_timetag != '':
+            real_timetag = int(_TIME_.mktime(_TIME_.strptime(real_timetag, '%Y%m%d')) * 1000)
+        else:
+            real_timetag = -1
+
+    return client.get_stock_list_in_sector(sector_name, real_timetag)
 
 
 def get_index_weight(index_code):
@@ -316,7 +345,6 @@ def get_financial_data(stock_list, table_list=[], start_time='', end_time='', re
         for s in data2:
             data[s] = data2[s]
 
-    import time
     import math
     def conv_date(data, key, key2):
         if key in data:
@@ -326,7 +354,7 @@ def get_financial_data(stock_list, table_list=[], start_time='', end_time='', re
                     data[key] = ''
                 else:
                     tmp_data = data[key2]
-            data[key] = time.strftime('%Y%m%d', time.localtime(tmp_data / 1000))
+            data[key] = _TIME_.strftime('%Y%m%d', _TIME_.localtime(tmp_data / 1000))
         return
 
     result = {}
@@ -341,7 +369,7 @@ def get_financial_data(stock_list, table_list=[], start_time='', end_time='', re
                 conv_date(row_data, 'm_timetag', '')
                 conv_date(row_data, 'declareDate', '')
                 conv_date(row_data, 'endDate', '')
-            result[stock][names[table]] = pd.DataFrame(table_data)
+            result[stock][names.get(table, table)] = pd.DataFrame(table_data)
     return result
 
 
@@ -575,7 +603,7 @@ def _get_data_file_path(stocklist, period, date = '20380119'):
 
     client = get_client()
 
-    path_result = __bsoncall_common(
+    path_result = _BSON_call_common(
         client.commonControl, 'getdatafilepath'
         , data
     )
@@ -597,8 +625,14 @@ __TUPLE_PERIODS = {
     , 'delistchangebond' : (4020, 86401000)
     , 'replacechangebond' : (4021, 86401000)
     , 'optionhistorycontract' : (9502, 86400000)
-    , 'etfiopv1m' :(4011, 60000)
-    , 'etfiopv1d' :(4011, 86400000)
+    , 'etfiopv1m' : (4011, 60000)
+    , 'etfiopv1d' : (4011, 86400000)
+    , 'announcement' : (9000, 86400000)
+    , 'hktdetails' : (2033, 86400000)
+    , 'stocklistchange' : (2012, 86400000)
+    , 'riskfreerate' : (2032, 86400000)
+    , 'etfstatistics': (3030, 0)
+    , 'etfstatisticsl2': (1830, 0)
 }
 
 __STR_PERIODS = {
@@ -639,8 +673,13 @@ def _get_market_data_ex_tuple_period_ori(
     ori_data = {}
     for stockcode in data_path_dict:
         file_name = data_path_dict[stockcode]
-        data_list = bson.BSON.decode(client.read_local_data(file_name, start_time, end_time, count)).get('result')
-        ori_data[stockcode] = data_list
+        data_list = client.read_local_data(file_name, start_time, end_time, count)
+
+        cdata_list = []
+        for data in data_list:
+            cdata_list.append(_BSON_.BSON.decode(data))
+
+        ori_data[stockcode] = cdata_list
 
     return ori_data
 
@@ -691,7 +730,7 @@ def _get_market_data_ex_tuple_period(
 
 def get_data_dir():
     cl = get_client()
-    return os.path.abspath(cl.get_data_dir())
+    return _OS_.path.abspath(cl.get_data_dir())
 
 
 def get_local_data(field_list=[], stock_list=[], period='1d', start_time='', end_time='', count=-1,
@@ -795,19 +834,62 @@ def getDividFactors(stock_code, date):
     return res
 
 
-def get_main_contract(code_market):
+def get_main_contract(code_market:str,start_time = "",end_time = ""):
     '''
-    获取当前期货主力合约
-    :param code_market: (str)股票代码
-    :return: str
+    ToDo: 获取主力合约/历史主力合约
+    注意：获取历史主力合约需要先调用下载函数xtdata.download_history_data(symbol, 'historymaincontract', '', '') 
+    Args: 
+        code_market: 主力连续合约code,如"IF00.IF","AP00.ZF"
+        start_time: 开始时间（可不填）,格式为"%Y%m%d",默认为""
+        end_time: 结束时间（可不填）,格式为"%Y%m%d",默认为""
+    Return:
+        str:默认取当前主力合约代码
+        str:当指定start_time,不指定end_time时,返回指定日期主力合约代码
+        pd.Series:当指定start_time,end_time,返回区间内主力合约组成的Series,index为时间戳
+    Example:
+        xtdata.get_main_contract("AP00.ZF") # 取当前主力合约
+
+        xtdata.get_main_contract("AP00.ZF","20230101") # 取历史某一天主力合约
+        
+        xtdata.get_main_contract("AP00.ZF","20230101","20240306") # 取某个时间段的主力合约序列
     '''
-    client = get_client()
-    return client.get_main_contract(code_market)
+    period = 'historymaincontract'
+    marker_code = code_market.split(".")[1]
+    
+    if start_time == "" and end_time == "":
+        client = get_client()
+        return client.get_main_contract(code_market) + "." + marker_code
+    elif start_time and end_time == "":
+        # 当指定start_time时,返回指定日期主力合约代码\n
+        data = get_market_data_ex([],[code_market],period)[code_market]
+        s_timetag = datetime_to_timetag(start_time,"%Y%m%d")
+
+        data = data.loc[data.iloc[:,0] < s_timetag]
+        if data.shape[0] > 0:
+            return data.iloc[-1,-1] + "." + marker_code
+        else:
+            return -1
+    elif start_time and end_time:
+        import pandas as pd
+        data = get_market_data_ex([],[code_market],period)[code_market]
+        s_timetag = datetime_to_timetag(start_time,"%Y%m%d")
+        e_timetag = datetime_to_timetag(end_time,"%Y%m%d")
+
+        data = data.loc[(data.iloc[:,0]<=e_timetag) & (data.iloc[:,0]>=s_timetag)]
+        if data.shape[0] > 0:
+            index = data.iloc[:,0]
+            values = data.iloc[:,-1] + "." + marker_code
+            
+            res = pd.Series(index=index.values, data=values.values)
+            res = res.loc[res.ne(res.shift(1))]
+            return res
+        else:
+            return -1
 
 def datetime_to_timetag(datetime, format = "%Y%m%d%H%M%S"):
     if len(datetime) == 8:
         format = "%Y%m%d"
-    timetag = time.mktime(time.strptime(datetime, format))
+    timetag = _TIME_.mktime(_TIME_.strptime(datetime, format))
     return timetag * 1000
 
 def timetag_to_datetime(timetag, format):
@@ -824,8 +906,8 @@ def timetag_to_datetime(timetag, format):
 def timetagToDateTime(timetag, format):
     import time
     timetag = timetag / 1000
-    time_local = time.localtime(timetag)
-    return time.strftime(format, time_local)
+    time_local = _TIME_.localtime(timetag)
+    return _TIME_.strftime(format, time_local)
 
 
 def get_trading_dates(market, start_time='', end_time='', count=-1):
@@ -849,6 +931,8 @@ def get_full_tick(code_list):
     :return: dict
     {'stock.market': {dict}}
     '''
+    import json
+
     client = get_client()
     resp_json = client.get_full_tick(code_list)
     return json.loads(resp_json)
@@ -859,12 +943,12 @@ def subscribe_callback_wrapper(callback):
     def subscribe_callback(datas):
         try:
             if type(datas) == bytes:
-                datas = bson.BSON.decode(datas)
+                datas = _BSON_.BSON.decode(datas)
             if callback:
                 callback(datas)
         except:
             print('subscribe callback error:', callback)
-            traceback.print_exc()
+            _TRACEBACK_.print_exc()
     return subscribe_callback
 
 def subscribe_callback_wrapper_1820(callback):
@@ -872,13 +956,13 @@ def subscribe_callback_wrapper_1820(callback):
     def subscribe_callback(datas):
         try:
             if type(datas) == bytes:
-                datas = bson.BSON.decode(datas)
+                datas = _BSON_.BSON.decode(datas)
             datas = _covert_hk_broke_data(datas)
             if callback:
                 callback(datas)
         except:
             print('subscribe callback error:', callback)
-            traceback.print_exc()
+            _TRACEBACK_.print_exc()
 
     return subscribe_callback
 
@@ -889,7 +973,7 @@ def subscribe_callback_wrapper_convert(callback, metaid):
     def subscribe_callback(datas):
         try:
             if type(datas) == bytes:
-                datas = bson.BSON.decode(datas)
+                datas = _BSON_.BSON.decode(datas)
             if convert_field_list:
                 for s in datas:
                     sdata = datas[s]
@@ -902,7 +986,7 @@ def subscribe_callback_wrapper_convert(callback, metaid):
                 callback(datas)
         except:
             print('subscribe callback error:', callback)
-            traceback.print_exc()
+            _TRACEBACK_.print_exc()
 
     return subscribe_callback
 
@@ -938,7 +1022,7 @@ def subscribe_quote(stock_code, period='1d', start_time='', end_time='', count=0
     region = {'startTime': start_time, 'endTime': end_time, 'count': count}
 
     client = get_client()
-    return client.subscribe_quote(bson.BSON.encode(meta), bson.BSON.encode(region), callback)
+    return client.subscribe_quote(_BSON_.BSON.encode(meta), _BSON_.BSON.encode(region), callback)
 
 
 def subscribe_l2thousand(stock_code, gear_num = 0, callback = None):
@@ -952,7 +1036,7 @@ def subscribe_l2thousand(stock_code, gear_num = 0, callback = None):
     region = {'thousandGearNum': gear_num, 'thousandDetailGear': 0, 'thousandDetailNum': 0}
 
     client = get_client()
-    return client.subscribe_quote(bson.BSON.encode(meta), bson.BSON.encode(region), callback)
+    return client.subscribe_quote(_BSON_.BSON.encode(meta), _BSON_.BSON.encode(region), callback)
 
 
 def subscribe_l2thousand_queue(
@@ -999,7 +1083,7 @@ def subscribe_l2thousand_queue(
     region = {'thousandDetailGear': 1000, 'thousandDetailNum': 1000}
 
     client = get_client()
-    return client.subscribe_quote(bson.BSON.encode(meta), bson.BSON.encode(region), callback)
+    return client.subscribe_quote(_BSON_.BSON.encode(meta), _BSON_.BSON.encode(region), callback)
 
 
 def get_l2thousand_queue(stock_code, gear = None, price = None):
@@ -1029,8 +1113,8 @@ def get_l2thousand_queue(stock_code, gear = None, price = None):
     data['gear'] = gear
     data['price'] = price
 
-    result_bson = client.commonControl('getl2thousandqueue', bson.BSON.encode(data))
-    result = bson.BSON.decode(result_bson)
+    result_bson = client.commonControl('getl2thousandqueue', _BSON_.BSON.encode(data))
+    result = _BSON_.BSON.decode(result_bson)
     return result.get('result')
 
 
@@ -1064,7 +1148,7 @@ def run():
     import time
     client = get_client()
     while True:
-        time.sleep(3)
+        _TIME_.sleep(3)
         if not client.is_connected():
             raise Exception('行情服务连接断开')
             break
@@ -1082,8 +1166,8 @@ def create_sector_folder(parent_node,folder_name,overwrite = True):
     data['parent'] = parent_node
     data['foldername'] = folder_name
     data['overwrite'] = overwrite
-    result_bson = client.commonControl('createsectorfolder', bson.BSON.encode(data))
-    result = bson.BSON.decode(result_bson)
+    result_bson = client.commonControl('createsectorfolder', _BSON_.BSON.encode(data))
+    result = _BSON_.BSON.decode(result_bson)
     return result.get('result')
 
 def create_sector(parent_node,sector_name,overwrite = True):
@@ -1098,8 +1182,8 @@ def create_sector(parent_node,sector_name,overwrite = True):
     data['parent'] = parent_node
     data['sectorname'] = sector_name
     data['overwrite'] = overwrite
-    result_bson = client.commonControl('createsector', bson.BSON.encode(data))
-    result = bson.BSON.decode(result_bson)
+    result_bson = client.commonControl('createsector', _BSON_.BSON.encode(data))
+    result = _BSON_.BSON.decode(result_bson)
     return result.get('result')
 
 def get_sector_list():
@@ -1121,8 +1205,8 @@ def add_sector(sector_name, stock_list):
     data = {}
     data['sectorname'] = sector_name
     data['stocklist'] = stock_list
-    result_bson = client.commonControl('addsector', bson.BSON.encode(data))
-    result = bson.BSON.decode(result_bson)
+    result_bson = client.commonControl('addsector', _BSON_.BSON.encode(data))
+    result = _BSON_.BSON.decode(result_bson)
     return result.get('result')
 
 def remove_stock_from_sector(sector_name, stock_list):
@@ -1135,8 +1219,8 @@ def remove_stock_from_sector(sector_name, stock_list):
     data = {}
     data['sectorname'] = sector_name
     data['stocklist'] = stock_list
-    result_bson = client.commonControl('removestockfromsector', bson.BSON.encode(data))
-    result = bson.BSON.decode(result_bson)
+    result_bson = client.commonControl('removestockfromsector', _BSON_.BSON.encode(data))
+    result = _BSON_.BSON.decode(result_bson)
     return result.get('result')
 
 def remove_sector(sector_name):
@@ -1147,8 +1231,8 @@ def remove_sector(sector_name):
     client = get_client()
     data = {}
     data['sectorname'] = sector_name
-    result_bson = client.commonControl('removesector', bson.BSON.encode(data))
-    result = bson.BSON.decode(result_bson)
+    result_bson = client.commonControl('removesector', _BSON_.BSON.encode(data))
+    result = _BSON_.BSON.decode(result_bson)
     return result.get('result')
 
 def reset_sector(sector_name, stock_list):
@@ -1161,11 +1245,13 @@ def reset_sector(sector_name, stock_list):
     data = {}
     data['sectorname'] = sector_name
     data['stocklist'] = stock_list
-    result_bson = client.commonControl('resetsector', bson.BSON.encode(data))
-    result = bson.BSON.decode(result_bson)
+    result_bson = client.commonControl('resetsector', _BSON_.BSON.encode(data))
+    result = _BSON_.BSON.decode(result_bson)
     return result.get('result')
 
 def _get_instrument_detail(stock_code):
+    from . import xtutil
+
     client = get_client()
     inst = client.get_instrument_detail(stock_code)
     if not inst:
@@ -1187,6 +1273,7 @@ def get_instrument_detail(stock_code, iscomplete = False):
         , InstrumentName(str):合约名称
         , ProductID(str):合约的品种ID(期货)
         , ProductName(str):合约的品种名称(期货)
+        , ProductType(str):合约的类型
         , ExchangeCode(str):交易所代码
         , UniCode(str):统一规则代码
         , CreateDate(int):上市日期(期货)
@@ -1242,6 +1329,7 @@ def get_instrument_detail(stock_code, iscomplete = False):
             , 'InstrumentName'
             , 'ProductID'
             , 'ProductName'
+            , 'ProductType'
             , 'ExchangeCode'
             , 'UniCode'
             , 'CreateDate'
@@ -1311,7 +1399,7 @@ def download_history_contracts():
 def _download_meta_data(stock_code, metaid, period, start_time = '', end_time = '', incrementally = True):
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.commonControl, 'downloadmetadata'
         , {
             'stockcode': stock_code
@@ -1348,7 +1436,7 @@ def download_history_data(stock_code, period, start_time = '', end_time = '', in
     client = get_client()
 
     if __download_version == '1':
-        return download_history_data2([stock_code], period, start_time, end_time, incrementally)
+        return download_history_data2([stock_code], period, start_time, end_time, None, incrementally)
     else:
         if incrementally is None:
             incrementally = False if start_time else True
@@ -1367,7 +1455,7 @@ supply_history_data = download_history_data
 
 def download_history_data2(stock_list, period, start_time='', end_time='', callback=None, incrementally = None):
     '''
-    :param stock_code: 股票代码 e.g. "000001.SZ"
+    :param stock_list: 股票代码列表 e.g. ["000001.SZ"]
     :param period: 周期 分笔"tick" 分钟线"1m"/"5m" 日线"1d"
     :param start_time: 开始时间，格式YYYYMMDD/YYYYMMDDhhmmss/YYYYMMDDhhmmss.milli，e.g."20200427" "20200427093000" "20200427093000.000"
         若取某日全量历史数据，时间需要具体到秒，e.g."20200427093000"
@@ -1375,6 +1463,9 @@ def download_history_data2(stock_list, period, start_time='', end_time='', callb
     :return: bool 是否成功
     '''
     client = get_client()
+
+    if isinstance(stock_list, str):
+        stock_list = [stock_list]
 
     if incrementally is None:
         incrementally = False if start_time else True
@@ -1409,16 +1500,16 @@ def download_history_data2(stock_list, period, start_time='', end_time='', callb
             status[0] = True
             status[3] = 'exception'
             return True
-    result = client.supply_history_data2(stock_list, period, start_time, end_time, bson.BSON.encode(param), on_progress)
+    result = client.supply_history_data2(stock_list, period, start_time, end_time, _BSON_.BSON.encode(param), on_progress)
     if not result:
         import time
         try:
             while not status[0] and client.is_connected():
-                time.sleep(0.1)
+                _TIME_.sleep(0.1)
         except:
             if status[1] < status[2]:
                 client.stop_supply_history_data2()
-            traceback.print_exc()
+            _TRACEBACK_.print_exc()
         if not client.is_connected():
             raise Exception('行情服务连接断开')
         if status[3]:
@@ -1426,7 +1517,7 @@ def download_history_data2(stock_list, period, start_time='', end_time='', callb
     return
 
 
-def download_financial_data(stock_list, table_list=[], start_time='', end_time=''):
+def download_financial_data(stock_list, table_list=[], start_time='', end_time='', incrementally = None):
     '''
     :param stock_list: 股票代码列表
     :param table_list: 财务数据表名列表，[]为全部表
@@ -1438,9 +1529,8 @@ def download_financial_data(stock_list, table_list=[], start_time='', end_time='
     if not table_list:
         table_list = ['Balance','Income','CashFlow','Capital','Top10FlowHolder','Top10Holder','HolderNum','PershareIndex']
 
-    for stock_code in stock_list:
-        for table in table_list:
-            client.supply_history_data(stock_code, table, start_time, end_time)
+    for table in table_list:
+        download_history_data2(stock_list, table, start_time, end_time, None, incrementally)
 
 
 def download_financial_data2(stock_list, table_list=[], start_time='', end_time='', callback=None):
@@ -1507,7 +1597,7 @@ def download_sector_data():
 def download_holiday_data():
     cl = get_client()
 
-    inst = __bsoncall_common(
+    inst = _BSON_call_common(
         cl.commonControl, 'downloadholidaydata', {}
     )
     return inst
@@ -1533,6 +1623,8 @@ def get_trading_calendar(market, start_time = '', end_time = ''):
     :param end_time: str 结束时间 '20201231'
     :return:
     '''
+    import datetime as dt
+
     if market != "SH" and market != "SZ":
         raise Exception("暂不支持除SH,SZ以外市场的交易日历")
 
@@ -1594,8 +1686,8 @@ def get_trading_time(stockcode):
     else:
         return []
 
-    inst = __bsoncall_common(
-        cl.commonControl, 'tradetime', {
+    inst = _BSON_call_common(
+        cl.commonControl, 'gettradingtime', {
             'market': market
             , 'code': code
         }
@@ -1613,7 +1705,7 @@ def download_cb_data():
 def get_cb_info(stockcode):
     client = get_client()
     inst = client.get_cb_info(stockcode)
-    return bson.BSON.decode(inst)
+    return _BSON_.BSON.decode(inst)
     
 def get_option_detail_data(optioncode):
     inst = _get_instrument_detail(optioncode)
@@ -1624,12 +1716,13 @@ def get_option_detail_data(optioncode):
     market = inst.get('ExchangeID')
     if market == 'SHO' or market == "SZO" \
         or ((market == "CFFEX" or market == "IF") and inst.get('InstrumentID').find('-') >= 0) \
-        or (market in ['SF', 'SHFE', 'DF', 'DCE', 'INE', 'GF', 'GFEX', 'ZF', 'CZCE'] and inst.get('ExtendInfo').get('OptionType') in [0, 1]):
+        or (market in ['SF', 'SHFE', 'DF', 'DCE', 'INE', 'GF', 'GFEX', 'ZF', 'CZCE'] and inst.get('ExtendInfo', {}).get('OptionType') in [0, 1]):
         field_list = [
             'ExchangeID'
             , 'InstrumentID'
             , 'InstrumentName'
             , 'ProductID'
+            , 'ProductType'
             , 'OpenDate'
             , 'CreateDate'
             , 'ExpireDate'
@@ -1684,6 +1777,15 @@ def get_option_detail_data(optioncode):
             ret["optType"] = "PUT"
 
         ret['OptUndlCodeFull'] = ret['OptUndlCode'] + '.' + ret['OptUndlMarket']
+
+        ProductCode = ret['ProductID']
+        if ProductCode.endswith('_o'):
+            ProductCode = ProductCode[:-2] + '.' + ret['OptUndlMarket']
+        elif market in ['ZF', 'CZCE']:
+            ProductCode = ProductCode[:-1] + '.' + ret['OptUndlMarket']
+        else:
+            ProductCode = ret['OptUndlCodeFull']
+        ret['ProductCode'] = ProductCode
     return ret
 
 
@@ -1695,6 +1797,14 @@ def get_option_undl_data(undl_code_ref):
         return ''
 
     if undl_code_ref:
+        c_undl_code_ref = undl_code_ref
+        inst = get_instrument_detail(undl_code_ref)
+        if inst and 'UniCode' in inst:
+            marketcodeList = undl_code_ref.split('.')
+            if (len(marketcodeList) != 2):
+                return []
+            c_undl_code_ref = inst['UniCode'] + '.' + marketcodeList[1]
+
         opt_list = []
         if undl_code_ref.endswith('.SH'):
             if undl_code_ref == "000016.SH" or undl_code_ref == "000300.SH" or undl_code_ref == "000852.SH" or undl_code_ref == "000905.SH":
@@ -1703,17 +1813,29 @@ def get_option_undl_data(undl_code_ref):
                 opt_list = get_stock_list_in_sector('上证期权')
         if undl_code_ref.endswith('.SZ'):
             opt_list = get_stock_list_in_sector('深证期权')
+        if undl_code_ref.endswith('.SF') or undl_code_ref.endswith('.SHFE'):
+            opt_list = get_stock_list_in_sector('上期所期权')
+        if undl_code_ref.endswith('.ZF') or undl_code_ref.endswith('.CZCE'):
+            opt_list = get_stock_list_in_sector('郑商所期权')
+        if undl_code_ref.endswith('.DF') or undl_code_ref.endswith('.DCE'):
+            opt_list = get_stock_list_in_sector('大商所期权')
+        if undl_code_ref.endswith('.GF') or undl_code_ref.endswith('.GFEX'):
+            opt_list = get_stock_list_in_sector('广期所期权')
+        if undl_code_ref.endswith('.INE'):
+            opt_list = get_stock_list_in_sector('能源中心期权')
         data = []
         for opt_code in opt_list:
             undl_code = get_option_undl(opt_code)
-            if undl_code == undl_code_ref:
+            if undl_code == c_undl_code_ref:
                 data.append(opt_code)
         return data
     else:
         opt_list = []
-        opt_list += get_stock_list_in_sector('上证期权')
-        opt_list += get_stock_list_in_sector('深证期权')
-        opt_list += get_stock_list_in_sector('中金所')
+        category_list = ['上证期权', '深证期权', '中金所', '上期所期权', '郑商所期权', '大商所期权', '广期所期权', '能源中心期权']
+        for category in category_list:
+            one_list = get_stock_list_in_sector(category)
+            opt_list += one_list
+
         result = {}
         for opt_code in opt_list:
             undl_code = get_option_undl(opt_code)
@@ -1733,6 +1855,9 @@ def get_option_list(undl_code, dedate, opttype = "", isavailavle = False):
         return []
     undlCode = marketcodeList[0]
     undlMarket = marketcodeList[1]
+    inst_data = get_instrument_detail(undl_code)
+    if inst_data and 'UniCode' in inst_data:
+        undlCode = inst_data['UniCode']
     market = ""
     if (undlMarket == "SH"):
         if undlCode == "000016" or undlCode == "000300" or undlCode == "000852" or undlCode == "000905":
@@ -1741,6 +1866,8 @@ def get_option_list(undl_code, dedate, opttype = "", isavailavle = False):
             market = "SHO"
     elif (undlMarket == "SZ"):
         market = "SZO"
+    else:
+        market = undlMarket
     if (opttype.upper() == "C"):
         opttype = "CALL"
     elif (opttype.upper() == "P"):
@@ -1755,6 +1882,21 @@ def get_option_list(undl_code, dedate, opttype = "", isavailavle = False):
     elif market == 'IF':
         optList += get_stock_list_in_sector('中金所')
         optList += get_stock_list_in_sector('过期中金所')
+    elif market == 'SF' or market == 'SHFE':
+        optList += get_stock_list_in_sector('上期所期权')
+        optList += get_stock_list_in_sector('过期上期所')
+    elif market == 'ZF' or market == 'CZCE':
+        optList += get_stock_list_in_sector('郑商所期权')
+        optList += get_stock_list_in_sector('过期郑商所')
+    elif market == 'DF' or market == 'DCE':
+        optList += get_stock_list_in_sector('大商所期权')
+        optList += get_stock_list_in_sector('过期大商所')
+    elif market == 'GF' or market == 'GFEX':
+        optList += get_stock_list_in_sector('广期所期权')
+        optList += get_stock_list_in_sector('过期广期所')
+    elif market == 'INE':
+        optList += get_stock_list_in_sector('能源中心期权')
+        optList += get_stock_list_in_sector('过期能源中心')
     for opt in optList:
         if (opt.find(market) < 0):
             continue
@@ -1782,11 +1924,25 @@ def get_option_list(undl_code, dedate, opttype = "", isavailavle = False):
 
 def get_his_option_list(undl_code, dedate):
     '''
-        获取历史上某日的指定品种期权信息列表
-        :param undl_code: (str)标的代码，格式 stock.market e.g."000300.SH"
-        :param date: (str)日期 格式YYYYMMDD，e.g."20200427"
-        :return: dataframe
-        '''
+    获取历史上某日的指定品种期权信息列表
+    :param undl_code: (str)标的代码，格式 stock.market e.g."000300.SH"
+    :param date: (str)日期 格式YYYYMMDD，e.g."20200427"
+    :return: dataframe
+    '''
+    if not dedate:
+        return None
+
+    data = get_his_option_list_batch(undl_code, dedate, dedate)
+    return data.get(dedate, None)
+
+
+def get_his_option_list_batch(undl_code, start_time = '', end_time = ''):
+    '''
+    获取历史上某段时间的指定品种期权信息列表
+    :param undl_code: (str)标的代码，格式 stock.market e.g."000300.SH"
+    :param start_time，start_time: (str)日期 格式YYYYMMDD，e.g."20200427"
+    :return: {date : dataframe}
+    '''
     split_codes = undl_code.rsplit('.', 1)
     if len(split_codes) == 2:
         stockcode = split_codes[0]
@@ -1794,6 +1950,7 @@ def get_his_option_list(undl_code, dedate):
 
     optmarket = market
     optcode = stockcode
+    product = stockcode
 
     isstockopt = False
 
@@ -1804,32 +1961,70 @@ def get_his_option_list(undl_code, dedate):
             optmarket = 'SHO'
         optcode = 'XXXXXX'
         isstockopt = True
-    if market == 'SZ':
+    elif market == 'SZ':
         optmarket = 'SZO'
         optcode = 'XXXXXX'
         isstockopt = True
+    else:
+        detail = get_instrument_detail(undl_code)
+        if detail:
+            optcode = detail.get('ProductID', optcode)
+            product = optcode
 
     code = optcode + '.' + optmarket
 
-    import datetime as dt
-    timetag = int(dt.datetime.strptime(dedate, '%Y%m%d').timestamp() * 1000)
+    end_time1 = end_time
+    if end_time:
+        import datetime as dt
+        time_tag = int(dt.datetime.strptime(end_time, '%Y%m%d').timestamp() * 1000)
+        time_tag = time_tag + 31 * 86400000
+        end_time1 = timetag_to_datetime(time_tag, '%Y%m%d')
 
-    data_all = get_market_data_ex([], [code], period='optionhistorycontract')[code]
+    data_all = get_market_data_ex(
+        []
+        , [code]
+        , period='optionhistorycontract'
+        , start_time = start_time
+        , end_time = end_time1
+    ).get(code, None)
+
     if data_all.empty:
-        return None
-
-    data1 = data_all.loc[data_all['time'] >= timetag].reset_index()
-    if data1.empty:
-        return None
-
-    data_time = data1.loc[0]['time']
+        return {}
 
     if isstockopt:
-        select = f'''time == {data_time} and 上市日 <= {dedate} and 到期日 >= {dedate} and 标的市场 == '{market}' and 标的编码 == '{stockcode}' '''
-    else:
+        select = f'''标的市场 == '{market}' and 标的编码 == '{stockcode}' '''
+        data_all = data_all.loc[data_all.eval(select)].reset_index()
+
+    data_all['期权完整代码'] = data_all['期权编码'] + '.' + data_all['期权市场']
+    data_all['标的完整代码'] = data_all['标的编码'] + '.' + data_all['标的市场']
+    data_all['期货品种'] = product
+
+    date_list = get_trading_dates(optmarket, start_time, end_time)
+
+    result = {}
+    min_opne_date = 0
+    for timetag in date_list:
+        dedate = int(timetag_to_datetime(timetag, '%Y%m%d'))
+
+        if dedate < min_opne_date:
+            continue
+
+        data1 = data_all.loc[data_all['time'] >= timetag].reset_index()
+        if data1.empty:
+            continue
+
+        data_time = data1.loc[0]['time']
         select = f'''time == {data_time} and 上市日 <= {dedate} and 到期日 >= {dedate}  '''
 
-    return data_all.loc[data_all.eval(select)].reset_index().drop(['index', 'time'], axis=1)
+        data2 = data_all.loc[data_all.eval(select)].reset_index().drop(['index', 'time'], axis=1)
+        if data2.empty:
+            select = f'''time == {data_time}  '''
+            data3 = data_all.loc[data_all.eval(select)].reset_index()
+            min_opne_date = data3['上市日'].min()
+        else:
+            result[str(dedate)] = data2
+
+    return result
 
 
 def get_ipo_info(start_time = '', end_time = ''):
@@ -1886,12 +2081,19 @@ def get_markets():
         , 'SHO': '上证期权'
         , 'SZO': '深证期权'
         , 'BKZS': '板块指数'
-        , 'WP': '外盘'
     }
 
 
+def get_wp_market_list():
+    '''
+    获取所有外盘的市场
+    返回 list
+    '''
+    return _BSON_call_common(get_client().commonControl, 'getwpmarketlist', {})
+
+
 def get_his_st_data(stock_code):
-    fileName = os.path.join(get_data_dir(), '..', 'data', 'SH_XXXXXX_2011_86400000.csv')
+    fileName = _OS_.path.join(get_data_dir(), '..', 'data', 'SH_XXXXXX_2011_86400000.csv')
 
     try:
         with open(fileName, "r") as f:
@@ -1937,23 +2139,24 @@ def get_his_st_data(stock_code):
     return result
 
 
-def subscribe_formula(formula_name, stock_code, period, start_time = '', end_time = '', count = -1, dividend_type = 'none', extend_param = {}, callback = None):
+def subscribe_formula(formula_name, stock_code, period, start_time = '', end_time = '', count = -1, dividend_type = None, extend_param = {}, callback = None):
     cl = get_client()
 
-    result = bson.BSON.decode(cl.commonControl('createrequestid', bson.BSON.encode({})))
+    result = _BSON_.BSON.decode(cl.commonControl('createrequestid', _BSON_.BSON.encode({})))
     request_id = result['result']
 
     data = {
         'formulaname': formula_name, 'stockcode': stock_code, 'period': period
         , 'starttime': start_time, 'endtime': end_time, 'count': count
-        , 'dividendtype': dividend_type, 'extendparam': extend_param
+        , 'dividendtype': dividend_type if dividend_type else 'none'
+        , 'extendparam': extend_param
         , 'create': True
     }
 
     if callback:
         callback = subscribe_callback_wrapper(callback)
 
-    cl.subscribeFormula(request_id, bson.BSON.encode(data), callback)
+    cl.subscribeFormula(request_id, _BSON_.BSON.encode(data), callback)
     return request_id
 
 
@@ -1963,35 +2166,36 @@ def bind_formula(request_id, callback = None):
     if callback:
         callback = subscribe_callback_wrapper(callback)
 
-    cl.subscribeFormula(request_id, bson.BSON.encode({}), callback)
+    cl.subscribeFormula(request_id, _BSON_.BSON.encode({}), callback)
     return
 
 
 def unsubscribe_formula(request_id):
     cl = get_client()
-    cl.subscribeFormula(request_id)
+    cl.unsubscribeFormula(request_id)
     return
 
 
 def call_formula(
     formula_name, stock_code, period
     , start_time = '', end_time = '', count = -1
-    , dividend_type = 'none', extend_param = {}
+    , dividend_type = None, extend_param = {}
 ):
     cl = get_client()
 
-    result = bson.BSON.decode(cl.commonControl('createrequestid', bson.BSON.encode({})))
+    result = _BSON_.BSON.decode(cl.commonControl('createrequestid', _BSON_.BSON.encode({})))
     request_id = result['result']
 
     data = {
         'formulaname': formula_name, 'stockcode': stock_code, 'period': period
         , 'starttime': start_time, 'endtime': end_time, 'count': count
-        , 'dividendtype': dividend_type, 'extendparam': extend_param
+        , 'dividendtype': dividend_type if dividend_type else 'none'
+        , 'extendparam': extend_param
         , 'create': True
     }
 
-    data = cl.subscribeFormulaSync(request_id, bson.BSON.encode(data))
-    return bson.BSON.decode(data)
+    data = cl.subscribeFormulaSync(request_id, _BSON_.BSON.encode(data))
+    return _BSON_.BSON.decode(data)
 
 gmd = get_market_data
 gmd2 = get_market_data_ex
@@ -2004,7 +2208,7 @@ gsl = get_stock_list_in_sector
 def reset_market_trading_day_list(market, datas):
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.custom_data_control, 'createmarketchange'
         , {
             'market': market
@@ -2012,7 +2216,7 @@ def reset_market_trading_day_list(market, datas):
     )
     cid = result['cid']
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.custom_data_control, 'addtradingdaytochange'
         , {
             'cid': cid
@@ -2021,7 +2225,7 @@ def reset_market_trading_day_list(market, datas):
         }
     )
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.custom_data_control, 'finishmarketchange'
         , {
             'cid': cid
@@ -2035,7 +2239,7 @@ def reset_market_trading_day_list(market, datas):
 def reset_market_stock_list(market, datas):
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.custom_data_control, 'createmarketchange'
         , {
             'market': market
@@ -2043,7 +2247,7 @@ def reset_market_stock_list(market, datas):
     )
     cid = result['cid']
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.custom_data_control, 'addstocktochange'
         , {
             'cid': cid
@@ -2052,7 +2256,7 @@ def reset_market_stock_list(market, datas):
         }
     )
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.custom_data_control, 'finishmarketchange'
         , {
             'cid': cid
@@ -2077,7 +2281,7 @@ def push_custom_data(meta, datas, coverall = False):
                 params[fields[k]] = v
         ans.append(params)
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.custom_data_control, 'pushcustomdata'
         , {
             "meta": meta
@@ -2089,7 +2293,7 @@ def push_custom_data(meta, datas, coverall = False):
 
 def get_period_list():
     client = get_client()
-    result = bson.BSON.decode(client.commonControl('getperiodlist', bson.BSON.encode({})))
+    result = _BSON_.BSON.decode(client.commonControl('getperiodlist', _BSON_.BSON.encode({})))
     request_id = result['result']
     return request_id
 
@@ -2116,27 +2320,27 @@ def gen_factor_index(
 
     callback = subscribe_callback_wrapper(onPushProgress)
 
-    get_client().subscribeCommonControl(
-        'genfactorindex'
-        , bson.BSON.encode(
-            {
-                'data_name': data_name
-                , 'formula_name': formula_name
-                , 'vars': vars
-                , 'sector_list': sector_list
-                , 'start_time': start_time
-                , 'end_time': end_time
-                , 'period': period
-                , 'dividend_type': dividend_type
-            }
-        )
-        ,callback
+    cl = get_client()
+    cl.registerCommonControlCallback("genfactorindex", callback)
+    _BSON_call_common(
+        cl.commonControl
+        , 'genfactorindex'
+        , {
+            'data_name': data_name
+            , 'formula_name': formula_name
+            , 'vars': vars
+            , 'sector_list': sector_list
+            , 'start_time': start_time
+            , 'end_time': end_time
+            , 'period': period
+            , 'dividend_type': dividend_type
+        }
     )
 
     last_finished = running_info['finished']
     time_count = 0
     while not running_info['result']:
-        time.sleep(1)
+        _TIME_.sleep(1)
         if last_finished != running_info['finished']:
             last_finished = running_info['finished']
             time_count = 0
@@ -2151,11 +2355,29 @@ def gen_factor_index(
     return running_info['result']
 
 
+def create_formula(formula_name, formula_content, formula_params = {}):
+    '''
+    新建策略
+    '''
+    data = {
+        'formula_name': formula_name
+        ,'content': formula_content
+    }
+
+    if formula_params:
+        data.update(formula_params)
+
+    return _BSON_call_common(get_client().commonControl
+        , 'createformula'
+        , data
+    )
+
+
 def import_formula(formula_name, file_path):
     '''
     导入策略
     '''
-    return __bsoncall_common(get_client().commonControl
+    return _BSON_call_common(get_client().commonControl
         , 'importformula'
         , {'formula_name': formula_name, 'file_path': file_path}
     )
@@ -2165,7 +2387,7 @@ def del_formula(formula_name):
     '''
     删除策略
     '''
-    return __bsoncall_common(get_client().commonControl
+    return _BSON_call_common(get_client().commonControl
         , 'delformula'
         , {'formula_name': formula_name}
     )
@@ -2175,7 +2397,7 @@ def get_formulas():
     '''
     查询所有的策略
     '''
-    return __bsoncall_common(get_client().commonControl, 'getformulas', {})
+    return _BSON_call_common(get_client().commonControl, 'getformulas', {})
 
 
 def read_feather(file_path):
@@ -2184,6 +2406,7 @@ def read_feather(file_path):
     :param file_path: (str)
     :return: param_bin: (dict), df: (pandas.DataFrame)
     '''
+    import sys
     if sys.version_info.major > 2:
         from pyarrow import feather
         if sys.version_info.minor > 6:
@@ -2195,7 +2418,7 @@ def read_feather(file_path):
         param_bin_bytes = metadata.get(b'param_bin')
         #param_str_bytes = metadata.get(b'param_str')
 
-        param_bin = bson.BSON.decode(param_bin_bytes)
+        param_bin = _BSON_.BSON.decode(param_bin_bytes)
         #param_str = param_str_bytes.decode('utf-8')
         df = table.to_pandas(use_threads=True)
         return param_bin, df
@@ -2211,10 +2434,11 @@ def write_feather(dest_path, param, df):
     :param df: (pandas.DataFrame) 数据
     :return: (bool) 成功/失败
     '''
+    import json, sys
     if sys.version_info.major > 2:
         from pyarrow import feather, Schema, Table
         schema = Schema.from_pandas(df).with_metadata({
-            'param_bin' : bson.BSON.encode(param),
+            'param_bin' : _BSON_.BSON.encode(param),
             'param_str' : json.dumps(param)
         })
         table = Table.from_pandas(df, schema=schema)
@@ -2243,8 +2467,8 @@ class QuoteServer:
             raise f'invalid address, ip:{ip}, port:{port}'
         return
 
-    def __bsoncall_common(self, interface, func, param):
-        return bson.BSON.decode(interface(func, bson.BSON.encode(param)))
+    def _BSON_call_common(self, interface, func, param):
+        return _BSON_.BSON.decode(interface(func, _BSON_.BSON.encode(param)))
 
     def __str__(self):
         return str(self.info)
@@ -2255,7 +2479,7 @@ class QuoteServer:
         '''
         cl = get_client()
 
-        return self.__bsoncall_common(
+        return self._BSON_call_common(
             cl.commonControl, 'quoteserverconnect'
             , {
                 'ip': self.info['ip']
@@ -2271,7 +2495,7 @@ class QuoteServer:
         '''
         cl = get_client()
 
-        result = self.__bsoncall_common(
+        result = self._BSON_call_common(
             cl.commonControl, 'quoteserverconnect'
             , {
                 'ip': self.info['ip']
@@ -2297,7 +2521,7 @@ class QuoteServer:
         '''
         cl = get_client()
 
-        result = self.__bsoncall_common(
+        result = self._BSON_call_common(
             cl.commonControl, 'quoteserversetkey'
             , {
                 'ip': self.info['ip']
@@ -2314,7 +2538,7 @@ class QuoteServer:
         '''
         cl = get_client()
 
-        result = self.__bsoncall_common(
+        result = self._BSON_call_common(
             cl.commonControl, 'testload'
             , {
                 'ip': self.info['ip']
@@ -2330,7 +2554,7 @@ class QuoteServer:
         '''
         cl = get_client()
 
-        inst = self.__bsoncall_common(
+        inst = self._BSON_call_common(
             cl.commonControl, 'getavailablekey'
             , {
                 'ip': self.info['ip']
@@ -2348,7 +2572,7 @@ class QuoteServer:
         '''
         cl = get_client()
 
-        inst = self.__bsoncall_common(
+        inst = self._BSON_call_common(
             cl.commonControl, 'getserverlist'
             , {
                 'ip': self.info['ip']
@@ -2371,7 +2595,7 @@ def get_quote_server_config():
     '''
     cl = get_client()
 
-    inst = __bsoncall_common(
+    inst = _BSON_call_common(
         cl.commonControl, 'getquoteserverconfig', {}
     )
     inst = inst.get('result', [])
@@ -2391,7 +2615,7 @@ def get_quote_server_status():
     '''
     cl = get_client()
 
-    inst = __bsoncall_common(
+    inst = _BSON_call_common(
         cl.commonControl, 'getquoteserverstatus', {}
     )
     inst = inst.get('result', [])
@@ -2418,20 +2642,21 @@ def watch_quote_server_status(callback):
     if callback:
         callback = subscribe_callback_wrapper(callback)
 
-    cl.subscribeCommonControl("watchquoteserverstatus", bson.BSON.encode({}), callback)
+    cl.registerCommonControlCallback("watchquoteserverstatus", callback)
+    _BSON_call_common(cl.commonControl, "watchquoteserverstatus", {})
     return
 
 def fetch_quote(root_path, key_list):
-    root_path = os.path.abspath(root_path)
+    root_path = _OS_.path.abspath(root_path)
     cl = get_client()
-    inst = __bsoncall_common(
+    inst = _BSON_call_common(
         cl.commonControl, 'fetchquote', {
             'dir': root_path
         }
     )
 
-    config_dir = os.path.join(root_path, 'userdata_mini', 'users', 'xtquoterconfig.xml')
-    if not os.path.isfile(config_dir):
+    config_dir = _OS_.path.join(root_path, 'userdata_mini', 'users', 'xtquoterconfig.xml')
+    if not _OS_.path.isfile(config_dir):
         return
 
     import xml.etree.ElementTree as ET
@@ -2529,7 +2754,7 @@ def download_his_st_data():
     '''
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.commonControl, 'downloadhisstdata', {}
     )
     return result
@@ -2582,11 +2807,6 @@ def get_broker_queue_data(stock_list = [], start_time = '', end_time = '', count
     return ori_data
 
 
-xtquant_status_callback = None
-def status_callback(info):
-    if xtquant_status_callback:
-        xtquant_status_callback(info)
-
 def watch_xtquant_status(callback):
     '''
     监控xtquant连接状态变化
@@ -2599,7 +2819,226 @@ def watch_xtquant_status(callback):
     if callback:
         callback = subscribe_callback_wrapper(callback)
 
-    global xtquant_status_callback
-    xtquant_status_callback = callback
+    from . import xtconn
+    xtconn.status_callback = callback
     return
+
+
+def get_full_kline(field_list = [], stock_list = [], period = '1m'
+    , start_time = '', end_time = '', count = 1
+    , dividend_type = 'none', fill_data = True):
+    '''
+    k线全推获取最新交易日数据
+    '''
+    cl = get_client()
+
+    all_data = _BSON_call_common(
+        cl.commonControl
+        , 'getfullkline'
+        , {
+            "stocklist": stock_list
+            , "period": period
+            , "starttime": start_time
+            , "endtime": end_time
+            , "count": count
+            , "dividendtype": dividend_type
+            , "fillData": fill_data
+            , "fields": field_list
+        }
+    )
+
+    import pandas as pd
+    data = all_data.get('result', {})
+    index = all_data.get('stock', [])
+    column = all_data.get('stime', [])
+
+    result = {}
+    for field in data:
+        result[field] = pd.DataFrame(data[field], index = index, columns = column)
+    return result
+
+
+def generate_index_data(
+    formula_name, formula_param = {}
+    , stock_list = [], period = '1d', dividend_type = 'none'
+    , start_time = '', end_time = ''
+    , fill_mode = 'fixed', fill_value = float('nan')
+    , result_path = None
+):
+    '''
+    formula_name:
+        str 模型名称
+    formula_param:
+        dict 模型参数
+            例如 {'param1': 1.0, 'param2': 'sym'}
+    stock_list:
+        list 股票列表
+    period:
+        str 周期
+            '1m' '5m' '1d'
+    dividend_type:
+        str 复权方式
+            'none' - 不复权
+            'front_ratio' - 等比前复权
+            'back_ratio' - 等比后复权
+    start_time:
+        str 起始时间 '20240101' '20240101000000'
+        '' - '19700101'
+    end_time:
+        str 结束时间 '20241231' '20241231235959'
+        '' - '20380119'
+    fill_mode:
+        str 空缺填充方式
+            'fixed' - 固定值填充
+            'forward' - 向前延续
+    fill_value:
+        float 填充数值
+            float('nan') - 以NaN填充
+    result_path:
+        str 结果文件路径，feather格式
+    '''
+    cl = get_client()
+
+    result = _BSON_call_common(cl.commonControl, 'createrequestid', {})
+    request_id = result['result']
+
+    result = _BSON_call_common(
+        cl.commonControl
+        , 'generateindexdata'
+        , {
+            'requestid': request_id
+            , 'formulaname': formula_name
+            , 'formulaparam': formula_param
+            , 'stocklist': stock_list
+            , 'period': period
+            , 'dividendtype': dividend_type
+            , 'starttime': start_time
+            , 'endtime': end_time
+            , 'fillmode': fill_mode
+            , 'fillvalue': fill_value
+            , 'resultpath': result_path
+        }
+    )
+
+    taskid = result['taskid']
+
+    status = _BSON_call_common(cl.commonControl, 'querytaskstatus', {'taskid': taskid})
+
+    from tqdm import tqdm
+
+    with tqdm(total = 1.0, dynamic_ncols = True) as pbar:
+        totalcount = 1.0
+        finishedcount = 0.0
+
+        if not status.get('done', True):
+            import time
+
+            while not status.get('done', True):
+                totalcount = status.get('totalcount', 1.0)
+                finishedcount = status.get('finishedcount', 0.0)
+
+                pbar.total = totalcount
+                pbar.update(finishedcount - pbar.n)
+
+                time.sleep(0.5)
+                status = _BSON_call_common(cl.commonControl, 'querytaskstatus', {'taskid': taskid})
+
+        pbar.update(totalcount - pbar.n)
+
+    if status.get('errorcode', None):
+        raise Exception(status)
+
+    return
+
+
+def download_tabular_data(stock_list, period, start_time = '', end_time = '', incrementally = None, download_type = 'bypage'):
+    '''
+    下载表数据，可以按条数或按时间范围下载
+
+    stock_list:
+        list 股票列表
+    period:
+        str 周期
+            '1m' '5m' '1d'
+    start_time:
+        str 起始时间 '20240101' '20240101000000'
+        '' - '19700101'
+    end_time:
+        str 结束时间 '20241231' '20241231235959'
+        '' - '20380119'
+    incrementally:
+        bool 是否增量
+            'fixed' - 固定值填充
+            'forward' - 向前延续
+    download_type:
+        str 下载类型
+            'bypage' - 按条数下载
+            'byregion' - 按时间范围下载
+    '''
+    if incrementally is None:
+        incrementally = False if start_time else True
+
+    if isinstance(stock_list, str):
+        stock_list = [stock_list]
+
+    if isinstance(period, tuple):
+        metaid, periodNum = period
+        periodstr = ''
+    else:
+        periodstr = period
+        metaid = -1
+        periodNum = -1
+
+    param = {
+        'stocklist': stock_list
+        , 'period': periodstr
+        , 'metaid': metaid
+        , 'periodNum': periodNum
+        , 'starttime' : start_time
+        , 'endtime' : end_time
+        , 'incrementally': incrementally
+        , 'type': download_type
+    }
+
+    cl = get_client()
+
+    result = _BSON_call_common(
+        cl.commonControl, 'downloadtabulardata', param
+    )
+
+    seq = result['seq']
+
+
+    status = _BSON_call_common(
+        cl.commonControl, 'getdownloadworkprogress', {'seq' : seq}
+    )
+
+    from tqdm import tqdm
+
+    with tqdm(total=1.0, dynamic_ncols=True) as pbar:
+        if not status.get('done', True):
+            import time
+
+            while not status.get('done', True):
+                #print(status)
+                totalcount = status.get('totalcount', 1.0)
+                finishedcount = status.get('finishedcount', 0.0)
+                percentage = finishedcount / max(totalcount, 1.0)
+
+                pbar.update(percentage - pbar.n)
+
+                _TIME_.sleep(1)
+                status = _BSON_call_common(
+                    cl.commonControl, 'getdownloadworkprogress', {'seq': seq}
+                )
+
+        pbar.update(1.0 - pbar.n)
+
+    if status.get('errormsg', None):
+        raise Exception(status)
+
+    return
+
+
+from .metatable import *
 

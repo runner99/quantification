@@ -1,15 +1,13 @@
 #coding:utf-8
 
-import os, sys
-import types
-import time
-
 from .functions import *
-from .contextinfo import ContextInfo
-from .stgframe import StrategyLoader
 
 
 def run_file(user_script, param = {}):
+    import os, sys, time, types
+    from .contextinfo import ContextInfo
+    from .stgframe import StrategyLoader
+
     pypath = param.get('pythonpath')
     if pypath:
         lib_search = [os.path.abspath(p) for p in pypath.split(';')]

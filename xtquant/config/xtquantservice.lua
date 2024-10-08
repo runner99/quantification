@@ -19,7 +19,7 @@ function()
             datasource_callback = 10,
             datasource_req = 10,
             datasource_other = 5,
-            whole_quote = 1,
+            whole_quote = 2,
             -- trade linkage
             linkage = 1,
             accounts = 5,
@@ -31,6 +31,9 @@ function()
             msg_service = 1,
             uicontrol_hpf_data_model = 1,
             server_miniquote = 1,
+            server_vbaservice = 1,
+            --指标全推
+            index_quote = 2,
         },
         client_xtservice = {
             tagTemplate = "xtservice",
@@ -79,6 +82,7 @@ function()
             ["1806"] = "0",
             ["1808"] = "60000,86400000",
             ["1820"] = "0",
+            ["1830"] = "0",
             ["2000"] = "86400000",
             ["2001"] = "86400000",
             ["2002"] = "86400000",
@@ -90,6 +94,8 @@ function()
             ["3001"] = "60000,300000,3600000,86400000",
             ["3002"] = "60000",
             ["3004"] = "60000",
+            ["3013"] = "86400000",
+            ["3030"] = "0",
             ["4000"] = "86400000",
             ["4002"] = "60000,300000,3600000,86400000",
             ["4011"] = "60000,86400000",

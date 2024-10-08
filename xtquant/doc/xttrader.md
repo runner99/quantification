@@ -87,6 +87,15 @@ XtQuant目前提供的库包括Python3.6、3.7、3.8版本，不同版本的pyth
   - 添加约券合约查询接口 `smt_query_compact`
 - 2024-01-02
     - 委托类型增加ETF申赎
+- 2024-02-29
+    - 添加期货持仓统计查询接口`query_position_statistics`
+- 2024-04-25
+    - 数据结构添加`stock_code1`字段以适配长代码
+- 2024-05-24
+    - 添加通用数据导出接口export_data
+    - 添加通用数据查询接口query_data
+- 2024-06-27
+    - 添加外部成交导入接口sync_transaction_from_external
 
 ## 快速入门 
 
@@ -252,10 +261,33 @@ if __name__ == "__main__":
 XtQuant封装了策略交易所需要的Python API接口，可以和MiniQMT客户端交互进行报单、撤单、查询资产、查询委托、查询成交、查询持仓以及收到资金、委托、成交和持仓等变动的主推消息。
 
 ## XtQuant数据字典
-### 交易市场(market)
+### 交易市场(market_int)
 
 - 上交所 - `xtconstant.SH_MARKET` 
 - 深交所 - `xtconstant.SZ_MARKET`
+- 北交所 - `xtconstant.MARKET_ENUM_BEIJING`
+- 上期所 - `xtconstant.MARKET_ENUM_SHANGHAI_FUTURE`
+- 大商所 - `xtconstant.MARKET_ENUM_DALIANG_FUTURE`
+- 郑商所 - `xtconstant.MARKET_ENUM_ZHENGZHOU_FUTURE`
+- 中金所 - `xtconstant.MARKET_ENUM_INDEX_FUTURE`
+- 能源中心 - `xtconstant.MARKET_ENUM_INTL_ENERGY_FUTURE`
+- 广期所 - `xtconstant.MARKET_ENUM_GUANGZHOU_FUTURE`
+- 上海期权 - `xtconstant.MARKET_ENUM_SHANGHAI_STOCK_OPTION`
+- 深圳期权 - `xtconstant.MARKET_ENUM_SHENZHEN_STOCK_OPTION`
+
+### 交易市场(market_str)
+
+- 上交所 - `xtconstant.MARKET_SHANGHAI` 
+- 深交所 - `xtconstant.MARKET_SHENZHEN`
+- 北交所 - `xtconstant.MARKET_BEIJING`
+- 上期所 - `xtconstant.MARKET_SHANGHAI_FUTURE`
+- 大商所 - `xtconstant.MARKET_DALIANG_FUTURE`
+- 郑商所 - `xtconstant.MARKET_ZHENGZHOU_FUTURE`
+- 中金所 - `xtconstant.MARKET_INDEX_FUTURE`
+- 能源中心 - `xtconstant.MARKET_INTL_ENERGY_FUTURE`
+- 广期所 - `xtconstant.MARKET_GUANGZHOU_FUTURE`
+- 上海期权 - `xtconstant.MARKET_SHANGHAI_STOCK_OPTION`
+- 深圳期权 - `xtconstant.MARKET_SHENZHEN_STOCK_OPTION`
 
 ### 账号类型(account_type)
 
@@ -453,6 +485,7 @@ strategy_name | str | 策略名称
 order_remark | str | 委托备注
 direction | int | 多空方向，股票不需要；参见数据字典 
 offset_flag | int | 交易操作，用此字段区分股票买卖，期货开、平仓，期权买卖等；参见数据字典 
+stock_code1 | str | 证券代码，例如"600000.SH" 
 
 ### 成交XtTrade
 属性|类型|注释
@@ -472,6 +505,7 @@ strategy_name | str | 策略名称
 order_remark | str | 委托备注
 direction | int | 多空方向，股票不需要；参见数据字典 
 offset_flag | int | 交易操作，用此字段区分股票买卖，期货开、平仓，期权买卖等；参见数据字典 
+stock_code1 | str | 证券代码，例如"600000.SH" 
 
 ### 持仓XtPosition
 属性|类型|注释
@@ -488,8 +522,57 @@ on_road_volume | int | 在途股份
 yesterday_volume | int | 昨夜拥股 
 avg_price | float | 成本价 
 direction | int | 多空方向，股票不需要；参见数据字典 
+stock_code1 | str | 证券代码，例如"600000.SH" 
+
+### 期货持仓统计XtPositionStatistics
+
+| 属性                               | 类型     | 注释                  |
+| ---------------------------------- | -------- | --------------------- |
+| `account_id`  | `string` | 账户                |
+| `exchange_id`  | `string` | 市场代码              |
+| `exchange_name`  | `string` | 市场名称              |
+| `product_id`  | `string` | 品种代码              |
+| `instrument_id`  | `string` | 合约代码              |
+| `instrument_name`  | `string` | 合约名称              |
+| `direction` | `int`    | 多空                  |
+| `hedge_flag`  | `int`    | 投保                  |
+| `position`  | `int`    | 持仓                  |
+| `yesterday_position`  | `int`    | 昨仓                  |
+| `today_position`  | `int`    | 今仓                  |
+| `can_close_vol`  | `int`    | 可平                  |
+| `position_cost`  | `float`  | 持仓成本              |
+| `avg_price`  | `float`  | 持仓均价              |
+| `position_profit`  | `float`  | 持仓盈亏              |
+| `float_profit`  | `float`  | 浮动盈亏              |
+| `open_price`  | `float`  | 开仓均价              |
+| `used_margin`  | `float`  | 已使用保证金          |
+| `used_commission`  | `float`  | 已使用的手续费        |
+| `frozen_margin`  | `float`  | 冻结保证金            |
+| `frozen_commission`  | `float`  | 冻结手续费            |
+| `instrument_value`  | `float`  | 市值，合约价值        |
+| `open_times`  | `int`    | 开仓次数              |
+| `open_volume`  | `int`    | 总开仓量 中间平仓不减 |
+| `cancel_times`  | `int`    | 撤单次数              |
+| `last_price`  | `float`  | 最新价                |
+| `rise_ratio`  | `float`  | 当日涨幅              |
+| `product_name`  | `string` | 产品名称              |
+| `royalty`  | `float`  | 权利金市值            |
+| `expire_date`  | `string` | 到期日                |
+| `assest_weight`  | `float`  | 资产占比              |
+| `increase_by_settlement`  | `float`  | 当日涨幅（结）        |
+| `margin_ratio`  | `float`  | 保证金占比            |
+| `float_profit_divide_by_used_margin` | `float`  | 浮盈比例（保证金）    |
+| `float_profit_divide_by_balance`  | `float`  | 浮盈比例（动态权益）  |
+| `today_profit_loss`  | `float`  | 当日盈亏（结）        |
+| `yesterday_init_position`  | `int`    | 昨日持仓              |
+| `frozen_royalty`  | `float`  | 冻结权利金            |
+| `today_close_profit_loss`  | `float`  | 当日盈亏（收）        |
+| `close_profit`  | `float`  | 平仓盈亏              |
+| `ft_product_name`  | `string` | 品种名称              |
+| `open_cost`  | `float`  | 开仓成本              |
 
 ### 异步下单委托反馈XtOrderResponse
+
 属性|类型|注释
 -|-|-
 account_type| int | 账号类型，参见数据字典 
@@ -989,7 +1072,7 @@ cancel_order_stock_sysid_async(account, market, order_sysid)
   - 根据券商柜台返回的合同编号对委托进行异步撤单操作
 * 参数
   - account - StockAccount 资金账号
-  - market - int 交易市场
+  - market - int/str 交易市场 见枚举类型 交易市场(market_int/market_str)
   - order_sysid - str 券商柜台的合同编号
 * 返回 
   - 返回撤单请求序号, 成功委托后的撤单请求序号为大于0的正整数, 如果为-1表示委托失败
@@ -1020,6 +1103,44 @@ fund_transfer(account, transfer_direction, price)
   - (success, msg)
     - success - bool 划拨操作是否成功
     - msg - str 反馈信息
+
+#### 外部交易数据录入
+
+```python
+sync_transaction_from_external(operation, data_type, account, deal_list)
+```
+
+* 释义 
+
+  - 通用数据导出
+
+* 参数 
+
+  * operation - str 操作类型，有"UPDATE","REPLACE","ADD","DELETE"
+  * data_type - str 数据类型，有"DEAL"
+  * account - StockAccount 资金账号
+  * deal_list - list 成交列表,每一项是Deal成交对象的参数字典,键名参考官网数据字典,大小写保持一致
+
+* 返回 
+
+  - result - dict 结果反馈信息
+
+* 示例
+
+  ```python
+  deal_list = [
+      			{'m_strExchangeID':'SF', 'm_strInstrumentID':'ag2407'
+          		, 'm_strTradeID':'123456', 'm_strOrderSysID':'1234566'
+          		, 'm_dPrice':7600, 'm_nVolume':1
+          		, 'm_strTradeDate': '20240627'
+              	}
+  ]
+  resp = xt_trader.sync_transaction_from_external('ADD', 'DEAL', acc, deal_list)
+  print(resp)
+  #成功输出示例：{'msg': 'sync transaction from external success'}
+  #失败输出示例：{'error': {'msg': '[0-0: invalid operation type: ADDD], '}}
+  ```
+
 
 ### 股票查询接口
 
@@ -1104,6 +1225,29 @@ account = StockAccount('1000000365')
 #xt_trader为XtQuant API实例对象
 positions = xt_trader.query_stock_positions(account)
 ```
+#### 期货持仓统计查询
+
+```
+query_position_statistics(account)
+```
+
+- 释义
+  - 查询期货账号的持仓统计
+- 参数
+  - account - StockAccount 资金账号
+- 返回
+  - 该账号对应的最新持仓对象XtPositionStatistics组成的list或者None
+- 备注
+  - None表示查询失败或者当日持仓列表为空
+- 示例
+  - 查询期货资金账号1000000365对应的最新持仓
+
+```
+account = StockAccount('1000000365', 'FUTURE')
+#xt_trader为XtQuant API实例对象
+positions = xt_trader.query_position_statistics(account)
+```
+
 ### 信用查询接口
 
 #### 信用资产查询
@@ -1344,6 +1488,70 @@ query_com_position(account)
       - costBalance - float 成本总额
       - bsOnTheWayVol - int 买卖在途量
       - prEnableVol - int 申赎可用量
+
+#### 通用数据导出
+
+```python
+export_data(account, result_path, data_type, start_time = None, end_time = None, user_param = {})
+```
+
+* 释义 
+
+  - 通用数据导出
+
+* 参数 
+
+  - account - StockAccount 资金账号
+  - result_path - str 导出路径，包含文件名及.csv后缀，如'C:\\Users\\Desktop\\test\\deal.csv'
+  - data_type - str 数据类型，如'deal'
+  - start_time - str 开始时间（可缺省）
+  - end_time - str  结束时间（可缺省）
+  - user_param - dict 用户参数（可缺省）
+
+* 返回 
+
+  - result - dict 结果反馈信息
+
+* 示例
+
+  ```python
+  resp = xt_trader.export_data(acc, 'C:\\Users\\Desktop\\test\\deal.csv', 'deal')
+  print(resp)
+  #成功输出示例：{'msg': 'export success'}
+  #失败输出示例：{'error': {'errorMsg': 'can not find account info, accountID:2000449 accountType:2'}}
+  ```
+
+  
+
+#### 通用数据查询
+
+```python
+query_data(account, result_path, data_type, start_time = None, end_time = None, user_param = {})
+```
+
+* 释义 
+
+  - 通用数据查询，利用export_data接口导出数据后再读取其中的数据内容，读取完毕后删除导出的文件
+
+* 参数 
+
+  同export_data
+
+* 返回 
+
+  - result - dict 数据信息
+
+* 示例
+
+  ```python
+  data = xt_trader.query_data(acc, 'C:\\Users\\Desktop\\test\\deal.csv', 'deal')
+  print(data)
+  #成功输出示例：
+  #    account_id    account_Type    stock_code    order_type    ...  
+  #0    2003695    2    688488.SH    23    ...
+  #1    2003695    2    000096.SZ    23    ...
+  #失败输出示例：{'error': {'errorMsg': 'can not find account info, accountID:2000449 accountType:2'}}
+  ```
 
 ### 约券相关接口
 

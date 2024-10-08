@@ -1,11 +1,6 @@
 #coding:utf-8
 
-import os, sys
-import datetime as dt
-import traceback
-import json
-
-from . import xtbson as bson, xtutil
+from . import xtbson as _BSON_
 
 ### connection
 
@@ -74,6 +69,9 @@ def get_client():
 
 ### utils
 def try_except(func):
+    import sys
+    import traceback
+
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -91,8 +89,8 @@ def try_except(func):
 
     return wrapper
 
-def __bsoncall_common(interface, func, param):
-    return bson.BSON.decode(interface(func, bson.BSON.encode(param)))
+def _BSON_call_common(interface, func, param):
+    return _BSON_.BSON.decode(interface(func, _BSON_.BSON.encode(param)))
 
 def create_view(viewID, view_type, title, group_id):
     client = get_client()
@@ -119,13 +117,13 @@ def push_view_data(viewID, datas):
     datas: { "timetags: [t1, t2, ...], "outputs": { "output1": [value1, value2, ...], ... }, "overwrite": "full/increase" }
     '''
     client = get_client()
-    bresult = client.pushViewData(viewID, 'index', bson.BSON.encode(datas))
-    return bson.BSON.decode(bresult)
+    bresult = client.pushViewData(viewID, 'index', _BSON_.BSON.encode(datas))
+    return _BSON_.BSON.decode(bresult)
 
 def switch_graph_view(stock_code = None, period = None, dividendtype = None, graphtype = None):
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.commonControl, 'switchgraphview'
         , {
             "stockcode": stock_code
@@ -170,7 +168,7 @@ def add_schedule(schedule_name, begin_time = '', finish_time = '', interval = 60
 
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.commonControl, 'addschedule'
         , {
             'name': schedule_name
@@ -223,7 +221,7 @@ def add_schedule_download_task(schedule_name, stock_code = [], period = '', rece
 
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.commonControl, 'addscheduledownloadtask'
         , {
             'name': schedule_name
@@ -241,7 +239,7 @@ def add_schedule_download_task(schedule_name, stock_code = [], period = '', rece
 def modify_schedule_task(schedule_name, begin_time = '', finish_time = '', interval = 60, run = False, only_work_date = False, always_run = False):
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.commonControl, 'modifyschedule'
         , {
             'name': schedule_name
@@ -257,7 +255,7 @@ def modify_schedule_task(schedule_name, begin_time = '', finish_time = '', inter
 def remove_schedule(schedule_name):
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.commonControl, 'removeschedule'
         , {
             'name': schedule_name
@@ -268,7 +266,7 @@ def remove_schedule(schedule_name):
 def remove_schedule_download_task(schedule_name, task_id):
     cl = get_client()
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.commonControl, 'removescheduledownloadtask'
         , {
             'name': schedule_name
@@ -280,7 +278,7 @@ def remove_schedule_download_task(schedule_name, task_id):
 def query_schedule_task():
     cl = get_client()
 
-    inst = __bsoncall_common(
+    inst = _BSON_call_common(
         cl.commonControl, 'queryschedule', {}
     )
 
@@ -313,7 +311,7 @@ def push_xtview_data(data_type, time, datas):
             numericDatas.append(value)
             types.append(0)
 
-    result = __bsoncall_common(
+    result = _BSON_call_common(
         cl.custom_data_control, 'pushxtviewdata'
         , {
             'dataType': data_type

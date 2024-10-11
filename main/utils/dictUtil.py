@@ -34,51 +34,27 @@ def getAllStockMain():
 def getAllEtf():
     '''
     获取A股所能买的etf
-    TODO
-    '''
-    return [stock for stock in stockA_list if stock.startswith(('60', '000', '002'))]
-
-def is_array_contained(arr1, arr2):
-    for item in arr2:
-        if item not in arr1:
-            return False
-    return True
-
-if __name__ == '__main__':
-    allmodule = getAllModule()
-    # for stock in allmodule:
-    #     print(stock)
+    TODO 需要验证返回的基金是否都能买
 
     conditions = ["ETF", "基金"]
 
     etf_or_fund_sectors = [sector for sector in allmodule if any(cond in sector for cond in conditions)]
 
-    result = None
+    正式环境：
+    沪市ETF:576
+    沪市基金:726
+    沪深ETF:988
+    沪深基金:1506
+    深市ETF:412
+    深市基金:780
 
-    print(etf_or_fund_sectors)
+    模拟环境：
+    沪市ETF:589
+    沪市基金:739
+    沪深ETF:1001
+    沪深基金:1519
+    深市ETF:412
+    深市基金:780
+    '''
+    return xtdata.get_stock_list_in_sector('沪深基金')
 
-    for etf in etf_or_fund_sectors:
-        aa = xtdata.get_stock_list_in_sector(etf)
-        print(etf + ':' + str(len(xtdata.get_stock_list_in_sector(etf))))
-        # for stock in aa :
-        #     print(stock)
-
-    # array1 = xtdata.get_stock_list_in_sector('沪深基金')
-    # array2 = xtdata.get_stock_list_in_sector('深市基金')
-    # print(is_array_contained(array1, array2))
-    # array1 = [1, 2, 3, 4, 5]
-    # array2 = [3, 4]
-    # print(is_array_contained(array1, array2))  # True
-    #
-    # array3 = [6, 7]
-    # print(is_array_contained(array1, array3))  # False
-    # print(1)
-
-
-
-
-def is_array_contained(arr1, arr2):
-    for item in arr2:
-        if item not in arr1:
-            return False
-    return True

@@ -2,22 +2,34 @@ from main.utils import dictUtil
 from xtquant import xtdata
 from datetime import datetime
 
-# todo 待完善
-if __name__ == '__main__':
-    allMain = dictUtil.getAllStock()
-    for stock in allMain:
-        # 定义股票代码、周期、开始时间和结束时间
-        stock_code = stock
-        period = '1d'
-        start_time = '20000101'
-        end_time = datetime.now().strftime("%Y%m%d%H%M%S")
+xtdata.enable_hello = False
 
-        xtdata.download_history_data(stock_code=stock, period='1d', start_time=start_time, end_time=end_time)
 
-        # # 获取本地数据
-        # history_data = xtdata.get_local_data(field_list=[], stock_list=[stock_code], period=period, start_time=start_time,
-        #                                      end_time=end_time, count=-1, dividend_type='none', fill_data=True)
-        #
-        # # 将数据转换为Pandas DataFrame
-        # df = pd.DataFrame(history_data[stock_code])
-        # print(df)
+def download_allMainStock(period_list=['1d', '1m'],
+                          start_time='20000101000000',
+                          end_time=datetime.now().strftime("%Y%m%d%H%M%S")):
+    download_allDayAndMin(dictUtil.getAllStockMain(), period_list, start_time, end_time)
+
+
+def download_allStock(period_list=['1d', '1m'],
+                      start_time='20000101000000',
+                      end_time=datetime.now().strftime("%Y%m%d%H%M%S")):
+    download_allDayAndMin(dictUtil.getAllStock(), period_list, start_time, end_time)
+
+
+def download_allEtf(period_list=['1d', '1m'],
+                    start_time='20000101000000',
+                    end_time=datetime.now().strftime("%Y%m%d%H%M%S")):
+    download_allDayAndMin(dictUtil.getAllEtf(), period_list, start_time, end_time)
+
+
+def download_allDayAndMin(stock_list, period_list, start_time, end_time):
+    for stock_code in stock_list:
+        for period in period_list:
+            download_history(stock_code, period, start_time, end_time)
+
+
+def download_history(stock_code, period, start_time='', end_time=''):
+    xtdata.download_history_data(stock_code=stock_code, period=period, start_time=start_time, end_time=end_time)
+
+

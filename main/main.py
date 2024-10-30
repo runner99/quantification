@@ -25,24 +25,22 @@ def call_filters(data):
 
     return result
 
-
-if __name__ == '__main__':
+def start_filter():
     start_time = time.time()
 
     all = dict_util.getAllStock()
     for item in all:
-        call_filters(item)
+        stock=call_filters(item)
 
 
     end_time = time.time()
     total_time = end_time - start_time
     average_time = total_time / len(all) if all else 0
 
-    start_time_formatted = datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')
-    end_time_formatted = datetime.fromtimestamp(end_time).strftime('%Y-%m-%d %H:%M:%S')
-
-    logger.info(f"start_time: {start_time_formatted}")
-    logger.info(f"end_time: {end_time_formatted}")
-
+    logger.info(f"start_time: {datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')},end_time: {datetime.fromtimestamp(end_time).strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info(f"Total time taken: {total_time:.2f} seconds,Total size:{len(all) if all else 0},Average time per item: {average_time:.3f} seconds")
-    logger.info(f"Average time per item: {average_time:.2f} seconds")
+
+
+
+if __name__ == '__main__':
+    start_filter()

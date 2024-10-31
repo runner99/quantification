@@ -18,7 +18,6 @@ def call_filters(data):
 
     for subclass in sorted_subclasses:
         result = subclass.filter(result)
-
         if result['flag'] is not None and result['flag'] == False:
             logger.warning(f"strategy is fail or error: {subclass}")
             break
@@ -28,9 +27,12 @@ def call_filters(data):
 def start_filter():
     start_time = time.time()
 
+    result_list=[]
     all = dict_util.getAllStock()
     for item in all:
         stock=call_filters(item)
+        if stock['flag']:
+            result_list.append(stock)
 
 
     end_time = time.time()

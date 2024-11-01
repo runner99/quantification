@@ -10,6 +10,10 @@ class BaseFilter:
         data_dict['stock']=data
         my_dict['data']=data_dict
         my_dict['flag'] = True
+
+        # 日线范围
+        my_dict['day_range'] = 3
+
         logger.info(f"BaseFilter filter called with data: {my_dict}")
         return my_dict
 

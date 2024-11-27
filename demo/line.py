@@ -3,13 +3,13 @@ import pandas as pd
 from xtquant import xtdata
 
 
-stock = '588400.SH'
+stock = '002415.SZ'
 
 # 定义股票代码、周期、开始时间和结束时间
 stock_code = stock
-period = '1m'
-start_time = '20000101'
-end_time = '20241231'
+period = '1d'
+start_time = '20241123'
+end_time = '20241126'
 
 # 获取本地数据
 history_data = xtdata.get_local_data(field_list=[], stock_list=[stock_code], period=period, start_time=start_time,

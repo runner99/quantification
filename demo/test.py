@@ -10,13 +10,13 @@ if __name__ == '__main__':
     # period_list=['1m']
     # download_util.download_allStock(period_list=period_list)
 
-    start_year = 2016
+    start_year = 2025
     current_year = start_year
 
     period_list=['1m']
 
     # 循环打印每年的起始时间
-    while current_year < 2025:  # 假设我们只打印到2024年
+    while current_year < 2027:  # 假设我们只打印到2024年
         # 构建日期对象
         start_date = datetime(current_year, 1, 1)
 

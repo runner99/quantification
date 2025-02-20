@@ -17,6 +17,7 @@ if __name__ == '__main__':
 
     df = history_data[stock_code]
     # 将数据转换为Pandas DataFrame
+    list = df['close'].tolist()
     print(df)
 
     # 将时间戳转换为日期格式

@@ -1,10 +1,6 @@
 # 1.quantification
 
-## 1.1.xtquant版本
-
-xtquant_250807
-
-## 1.2.依赖导入导出
+## 1.1.依赖导入导出
 
 pip freeze > requirements.txt
 
